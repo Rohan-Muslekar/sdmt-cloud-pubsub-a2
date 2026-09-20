@@ -22,15 +22,23 @@ print(f"Listening for messages on {subscription_path}..\n")
 
 count = 0
 
+# Cloud Pub/Sub guarantees at-least-once delivery, so the same record can be
+# delivered more than once. message_id is stable across redeliveries, so it is
+# used to tell a redelivery apart from a new record.
+seen = set()
+
 # A callback function for handling received messages
 def callback(message: pubsub_v1.subscriber.message.Message) -> None:
     global count
     # convert from bytes to dictionary (deserialization)
     record = json.loads(message.data.decode('utf-8'));
     count += 1
+    duplicate = message.message_id in seen
+    seen.add(message.message_id)
 
     # print the values of the dictionary
-    print("Record {}: {}".format(count, list(record.values())))
+    print("Record {}: {}{}".format(len(seen), list(record.values()),
+                                   "   [redelivery]" if duplicate else ""))
 
     # Report to Google Pub/Sub the successful processing of the received message
     message.ack()
@@ -43,4 +51,4 @@ with subscriber:
         streaming_pull_future.result()
     except KeyboardInterrupt:
         streaming_pull_future.cancel()
-        print("\nStopped after consuming {} records.".format(count))
+        print("\nStopped after {} deliveries, {} unique records.".format(count, len(seen)))
