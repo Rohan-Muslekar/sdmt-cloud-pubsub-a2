@@ -1,0 +1,9 @@
+# Service account keys. The scripts pick up the key with glob("*.json"),
+# so every .json in the tree is a credential by convention. Never commit one.
+*.json
+
+.venv/
+__pycache__/
+
+# Recording helpers and raw footage, not part of the deliverable
+video/

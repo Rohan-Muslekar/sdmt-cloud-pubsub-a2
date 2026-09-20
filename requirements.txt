@@ -1,0 +1,2 @@
+google-cloud-pubsub==2.41.0
+numpy==2.5.3
