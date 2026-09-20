@@ -2,6 +2,7 @@ from google.cloud import pubsub_v1      # pip install google-cloud-pubsub  ##to 
 import glob                             # for searching for json file
 import json
 import os
+import threading
 
 # Search the current directory for the JSON file (including the service account key)
 # to set the GOOGLE_APPLICATION_CREDENTIALS environment variable.
@@ -27,18 +28,25 @@ count = 0
 # used to tell a redelivery apart from a new record.
 seen = set()
 
+# Streaming pull runs this callback on several threads at once, so both the
+# shared state and the printing are guarded by a lock. Without it, two callbacks
+# interleave and their output lands on the same line.
+lock = threading.Lock()
+
 # A callback function for handling received messages
 def callback(message: pubsub_v1.subscriber.message.Message) -> None:
     global count
     # convert from bytes to dictionary (deserialization)
     record = json.loads(message.data.decode('utf-8'));
-    count += 1
-    duplicate = message.message_id in seen
-    seen.add(message.message_id)
 
-    # print the values of the dictionary
-    print("Record {}: {}{}".format(len(seen), list(record.values()),
-                                   "   [redelivery]" if duplicate else ""))
+    with lock:
+        count += 1
+        duplicate = message.message_id in seen
+        seen.add(message.message_id)
+
+        # print the values of the dictionary
+        print("Record {}: {}{}".format(len(seen), list(record.values()),
+                                       "   [redelivery]" if duplicate else ""))
 
     # Report to Google Pub/Sub the successful processing of the received message
     message.ack()
